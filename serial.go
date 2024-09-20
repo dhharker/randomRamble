@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -49,6 +50,8 @@ func findTPV2Port(portName string) *enumerator.PortDetails {
 
 // Function to change mode by setting different baud rates
 func modeChange(MODE string, PORT string) error {
+	log.Printf("Setting RNG to %s...", MODE)
+
 	// Function to open and close the port at specific baud rate
 	knockSequence := func(baud int) error {
 		mode := &serial.Mode{
@@ -97,7 +100,7 @@ func modeChange(MODE string, PORT string) error {
 	case "MODE_NORMAL_ASC_SLOW":
 		baud = 230400
 	default:
-		return log.Fatal("Invalid mode: %s", MODE)
+		return fmt.Errorf("invalid mode: %v", MODE)
 	}
 
 	// Final mode change

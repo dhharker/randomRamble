@@ -21,8 +21,10 @@ func main() {
 	tpv2 := findTPV2Port(config.port)
 
 	// Set TrueRNG mode to RAWBIN using port-knocking protocol
-	log.Printf("Setting RNG to raw binary mode...")
-	modeChange("MODE_RAW_BIN", tpv2.Name)
+
+	if err := modeChange("MODE_RAW_BIN", tpv2.Name); err != nil {
+		log.Fatalf("Error setting mode: %v", err)
+	}
 
 	// Main Loop
 	// Parse RAWBIN format and return random 10-bit numbers A and B
