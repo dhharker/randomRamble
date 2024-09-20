@@ -21,6 +21,7 @@ I commit to writing proper tests for each module. I don't know how yet, but I wi
     - [ ] (2) Integrate over a longer window with more recent values given a higher weighting
     - [ ] (3) Integrate over n windows something like Wolf's app for the Wyrdoscope works
 - [ ] Realtime display of results
+    - [ ] Probably use fyne https://fyne.io/blog/2019/03/19/building-cross-platform-gui.html for GUI
     - [ ] 1+ histograms for (1),(2) above?
     - [ ] A fun shortest-window or weighted-window feedback e.g. tone, colour, size
     - [ ] Gamification???
