@@ -16,13 +16,14 @@ func main() {
 
 	// Parse arguments/env return config object
 	config := getConfig()
-	log.Printf("%v", config)
 
 	// Find USB serial ports with a TrueRNGpro V2 attached
 	tpv2 := findTPV2Port(config.port)
-	log.Printf("%v", tpv2)
 
 	// Set TrueRNG mode to RAWBIN using port-knocking protocol
+	log.Printf("Setting RNG to raw binary mode...")
+	modeChange("MODE_RAW_BIN", tpv2.Name)
+
 	// Main Loop
 	// Parse RAWBIN format and return random 10-bit numbers A and B
 	// Read data from TrueRNG (discarding first 64 bytes if >threshold time since last read)
