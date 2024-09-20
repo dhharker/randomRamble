@@ -3,14 +3,15 @@ package main
 import (
 	"flag"
 	"log"
-	"os"
 	"time"
 )
 
 type Config struct {
 	fileName        string
 	captureDuration time.Duration
+	tickDelayMs     int
 	port            string
+	skipModeset     bool
 }
 
 func getConfig() *Config {
@@ -19,7 +20,9 @@ func getConfig() *Config {
 
 	flag.StringVar(&c.fileName, "filename", "", "Base filename to record data. Leave blank to not save data.")
 	flag.DurationVar(&c.captureDuration, "duration", 0, "How long to capture for e.g. 10s. Leave blank to run until closed.")
+	flag.IntVar(&c.tickDelayMs, "rate", 1000, "Delay between samples in ms e.g. 100 to sample at 10Hz.")
 	flag.StringVar(&c.port, "port", "", "USBTTY Port with TrueRNGpro V2. Leave blank to auto-detect.")
+	flag.BoolVar(&c.skipModeset, "skip-modeset", false, "DANGER skip modeset on init. Modeset is slow. Only use if mode already set.")
 
 	flag.Parse()
 
@@ -32,11 +35,15 @@ func getConfig() *Config {
 	if int(c.captureDuration) == 0 {
 		log.Println("Will capture indefinitely until program is terminated.")
 	} else if c.captureDuration < 0 {
-		log.Println("Cannot capture for negative duration.")
-		os.Exit(2)
+		log.Fatal("Cannot capture for negative duration.")
 	} else {
 		log.Printf("Will capture for %v or until program is terminated.", c.captureDuration)
 	}
+
+	if c.tickDelayMs < 1 {
+		log.Fatal("Min sample rate 10ms")
+	}
+	log.Printf("Will sample every %vms (~%2.1fHz)", c.tickDelayMs, float64(1000/c.tickDelayMs))
 
 	if c.port == "" {
 		log.Println("Will attempt to auto detect which port the TrueRNGproV2 is connected to.")

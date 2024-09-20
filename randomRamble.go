@@ -4,7 +4,18 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"time"
 )
+
+const READ_BUFFER_SIZE int = 128
+const MAX_PAIRS_RB = READ_BUFFER_SIZE / 4
+
+type Sample struct {
+	sampleCount uint64
+	sampleTime  time.Time
+	rawData     []byte
+	values      [MAX_PAIRS_RB][2]int16
+}
 
 func main() {
 	log.Println("Random Ramble")
@@ -21,22 +32,71 @@ func main() {
 	tpv2 := findTPV2Port(config.port)
 
 	// Set TrueRNG mode to RAWBIN using port-knocking protocol
-
-	if err := modeChange("MODE_RAW_BIN", tpv2.Name); err != nil {
+	if config.skipModeset {
+		log.Printf("DANGER - skipping modeset.")
+	} else if err := modeChange("MODE_RAW_BIN", tpv2.Name); err != nil {
 		log.Fatalf("Error setting mode: %v", err)
 	}
 
-	// Main Loop
-	// Parse RAWBIN format and return random 10-bit numbers A and B
-	// Read data from TrueRNG (discarding first 64 bytes if >threshold time since last read)
-	// (1) Integrate over a fixed window of a second or two
-	// (2) Integrate over a longer window with more recent values given a higher weighting
-	// (3) Integrate over n windows something like Wolf's app for the Wyrdoscope works
-	// Realtime display of results
-	// Probably use fyne https://fyne.io/blog/2019/03/19/building-cross-platform-gui.html for GUI
-	// 1+ histograms for (1),(2) above?
-	// A fun shortest-window or weighted-window feedback e.g. tone, colour, size
-	// Gamification???
-	// Do this via a webserver so people can use the RNG remotely
+	// // Connect to rng
+	rng := getConnected(tpv2.Name)
+	defer rng.Close()
+
+	// Get ready to read data
+	signalReadSerialChan := make(chan time.Time)
+	defer close(signalReadSerialChan)
+	stopReaderChan := make(chan bool)
+	defer close(stopReaderChan)
+	rawDataChan := make(chan *Sample)
+	defer close(rawDataChan)
+	go readSerialOnDemand(rng, rawDataChan, signalReadSerialChan, stopReaderChan)
+
+	// Parse raw data into a Sample
+	stopParserChan := make(chan bool)
+	defer close(stopParserChan)
+	sampleChan := make(chan *Sample)
+	defer close(sampleChan)
+	go doParsing(rawDataChan, sampleChan, stopParserChan)
+
+	// Get ready to process data
+	stopMathChan := make(chan bool)
+	defer close(stopMathChan)
+	numbersChan := make(chan float64)
+	defer close(numbersChan)
+	go doMath(sampleChan, numbersChan, stopMathChan)
+
+	// Display the data to the user somehow
+	stopDisplayChan := make(chan bool)
+	defer close(stopDisplayChan)
+	go doDisplay(numbersChan, stopDisplayChan)
+
+	// Ticker to read data at intervals
+	stopTickerChan := make(chan bool)
+	defer close(stopTickerChan)
+	ticker := time.NewTicker(time.Duration(config.tickDelayMs) * time.Millisecond)
+	go demandSerialReadOnTick(ticker, signalReadSerialChan, stopTickerChan)
+
+	// As soon as anything writes to this, we shut down.
+	shutdownCtlChan := make(chan bool)
+	defer close(shutdownCtlChan)
+
+	// Shut down after run duration, if specified
+	go shutdownAfterDelay(config.captureDuration, shutdownCtlChan)
+
+	// Shut down on SIGINT or SIGKILL
+	go shutdownOnSignal(shutdownCtlChan)
+
+	// block until someone writes to the shutdown chan
+	<-shutdownCtlChan
+
+	// CLEAN UP AND SHUT DOWN
+	log.Println("Shutting down...")
+	stopTickerChan <- true
+	stopReaderChan <- true
+	stopParserChan <- true
+	stopMathChan <- true
+	stopDisplayChan <- true
+	rng.Close()
+	log.Printf("Bye!")
 
 }

@@ -66,12 +66,15 @@ func modeChange(MODE string, PORT string) error {
 	}
 
 	// Knock sequence to activate mode change
+	log.Printf("   Knock once...")
 	if err := knockSequence(110); err != nil {
 		return err
 	}
+	log.Printf("   Knock twice...")
 	if err := knockSequence(300); err != nil {
 		return err
 	}
+	log.Printf("   Knock thrice...")
 	if err := knockSequence(110); err != nil {
 		return err
 	}
@@ -107,11 +110,75 @@ func modeChange(MODE string, PORT string) error {
 	mode := &serial.Mode{
 		BaudRate: baud,
 	}
+	log.Printf("   Fourth and final knock...")
 	port, err := serial.Open(PORT, mode)
 	if err != nil {
 		return err
 	}
-	defer port.Close()
+	port.Close()
 
+	log.Printf("   Done knocking!")
 	return nil
+}
+
+// Connect to RNG ready to read data
+func getConnected(portName string) serial.Port {
+
+	// Connect to RNG
+	mode := &serial.Mode{
+		BaudRate: 9600,
+	}
+	port, err := serial.Open(portName, mode)
+	if err != nil {
+		log.Fatalf("Failed to open serial port '%v': %v", portName, err)
+	}
+
+	// RNG sends data once DTR true
+	port.SetDTR(true)
+	// If it goes south, die
+	port.SetReadTimeout(3 * time.Second)
+
+	return port
+}
+
+// goroutine to read samples from RNG
+func readSerialOnDemand(port serial.Port, readChan chan *Sample, signalChan chan time.Time, stopReaderChan chan bool) {
+	var sampleCounter uint64 = 0
+	for {
+		var readTime time.Time
+
+		select {
+		case <-stopReaderChan:
+			log.Printf("Stopping serial reader after %v samples.", sampleCounter)
+			return
+		case readTime = <-signalChan:
+			// block until we're ready for the next read
+		}
+
+		// Create a buffer to hold incoming data
+		buffer := make([]byte, READ_BUFFER_SIZE)
+
+		// Flush the buffer first so we're getting freshest data
+		port.ResetInputBuffer()
+
+		// Attempt to read from the serial port
+		n, err := port.Read(buffer)
+
+		if err != nil {
+			log.Println("Error reading from serial:", err)
+			continue
+		}
+
+		sampleCounter++
+		spl := &Sample{
+			sampleCount: sampleCounter,
+			sampleTime:  readTime,
+			rawData:     buffer[:n],
+		}
+
+		// Send the data to the main program via readChan
+		if n > 0 {
+			readChan <- spl
+		}
+	}
 }

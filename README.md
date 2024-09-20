@@ -40,3 +40,11 @@ Needed to run this to fix error:
 ```
 $ pkg-config --cflags --libs libusb-1.0
 ```
+
+### Dev
+
+Install fyne helper and deps https://docs.fyne.io/started/
+```
+sudo apt-get install golang gcc libgl1-mesa-dev xorg-dev
+go install fyne.io/fyne/v2/cmd/fyne@latest
+```
