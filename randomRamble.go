@@ -2,17 +2,26 @@ package main
 
 import (
 	"log"
+	"os"
+	"runtime"
 )
-
-var port string
 
 func main() {
 	log.Println("Random Ramble")
 
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		log.Printf("RandomRamble developed on linux, might work on mac, windows not supported.")
+		os.Exit(1)
+	}
+
 	// Parse arguments/env return config object
 	config := getConfig()
 	log.Printf("%v", config)
-	// Detect TrueRNG return serial port name
+
+	// Find USB serial ports with a TrueRNGpro V2 attached
+	tpv2 := findTPV2Port(config.port)
+	log.Printf("%v", tpv2)
+
 	// Set TrueRNG mode to RAWBIN using port-knocking protocol
 	// Main Loop
 	// Parse RAWBIN format and return random 10-bit numbers A and B

@@ -11,7 +11,7 @@ I commit to writing proper tests for each module. I don't know how yet, but I wi
 
 ## Modules
 
-- [ ] Parse arguments return config object
+- [x] Parse arguments return config object
 - [ ] Detect TrueRNG return serial port name
 - [ ] Set TrueRNG mode to RAWBIN using port-knocking protocol
 - [ ] Parse RAWBIN format and return random 10-bit numbers A and B
@@ -33,3 +33,10 @@ I commit to writing proper tests for each module. I don't know how yet, but I wi
 
 - Ringbuffer as main buffer? https://github.com/jtarchie/ringbuffer/blob/1b71af3216f6fc70446930c0b7703c792622705f/go.mod
 - Can you slice a ringbuffer made with channels?
+
+### pkg-config error finding libusb-1.0 on linux mint 22
+
+Needed to run this to fix error:
+```
+$ pkg-config --cflags --libs libusb-1.0
+```
