@@ -7,7 +7,6 @@
 
 I don't know Go, and haven't written a full piece of software for over about 5 years. So this is going to be a learning journey and perhaps not The Best Way of doing things.
 
-I commit to writing proper tests for each module. I don't know how yet, but I will!
 
 ## Modules
 
@@ -47,4 +46,5 @@ Install fyne helper and deps https://docs.fyne.io/started/
 ```
 sudo apt-get install golang gcc libgl1-mesa-dev xorg-dev
 go install fyne.io/fyne/v2/cmd/fyne@latest
+go mod tidy
 ```
