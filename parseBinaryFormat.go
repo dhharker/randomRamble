@@ -22,14 +22,15 @@ func parseRngBinaryFormat(spl *Sample) *Sample {
 			locked = true
 			switch header {
 			case masks[0]:
-				spl.values[seq][0] = int16(cb&0x0F) << 6
+				spl.rawValues[seq][0] = ((uint16(cb & 0x0F)) << 6)
 			case masks[1]:
-				spl.values[seq][0] |= int16(cb & 0x3F)
+				spl.rawValues[seq][0] |= (uint16(cb & 0x3F))
 			case masks[2]:
-				spl.values[seq][1] = int16(cb&0x0F) << 6
+				spl.rawValues[seq][1] = ((uint16(cb & 0x0F)) << 6)
 			case masks[3]:
-				spl.values[seq][1] |= int16(cb & 0x3F)
+				spl.rawValues[seq][1] |= (uint16(cb & 0x3F))
 				seq++
+			default:
 			}
 		}
 	}

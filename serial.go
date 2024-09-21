@@ -66,15 +66,15 @@ func modeChange(MODE string, PORT string) error {
 	}
 
 	// Knock sequence to activate mode change
-	log.Printf("   Knock once...")
+	// log.Printf("   Knock once...")
 	if err := knockSequence(110); err != nil {
 		return err
 	}
-	log.Printf("   Knock twice...")
+	// log.Printf("   Knock twice...")
 	if err := knockSequence(300); err != nil {
 		return err
 	}
-	log.Printf("   Knock thrice...")
+	// log.Printf("   Knock thrice...")
 	if err := knockSequence(110); err != nil {
 		return err
 	}
@@ -110,14 +110,14 @@ func modeChange(MODE string, PORT string) error {
 	mode := &serial.Mode{
 		BaudRate: baud,
 	}
-	log.Printf("   Fourth and final knock...")
+	// log.Printf("   Fourth and final knock...")
 	port, err := serial.Open(PORT, mode)
 	if err != nil {
 		return err
 	}
 	port.Close()
 
-	log.Printf("   Done knocking!")
+	// log.Printf("   Done knocking!")
 	return nil
 }
 
@@ -174,6 +174,12 @@ func readSerialOnDemand(port serial.Port, readChan chan *Sample, signalChan chan
 			sampleCount: sampleCounter,
 			sampleTime:  readTime,
 			rawData:     buffer[:n],
+			walkSums: WalkSums{
+				sum:   0,
+				sumA:  0,
+				sumB:  0,
+				sumEq: 0,
+			},
 		}
 
 		// Send the data to the main program via readChan

@@ -7,14 +7,24 @@ import (
 	"time"
 )
 
-const READ_BUFFER_SIZE int = 128
+const READ_BUFFER_SIZE int = 64
 const MAX_PAIRS_RB = READ_BUFFER_SIZE / 4
 
 type Sample struct {
 	sampleCount uint64
 	sampleTime  time.Time
 	rawData     []byte
-	values      [MAX_PAIRS_RB][2]int16
+	rawValues   [MAX_PAIRS_RB][2]uint16
+	pruned      [MAX_PAIRS_RB][2]byte
+	walkDeltas  [MAX_PAIRS_RB][2]int8
+	walkSums    WalkSums
+}
+
+type WalkSums struct {
+	sum   int64
+	sumA  int64
+	sumB  int64
+	sumEq int64
 }
 
 func main() {
@@ -61,7 +71,7 @@ func main() {
 	// Get ready to process data
 	stopMathChan := make(chan bool)
 	defer close(stopMathChan)
-	numbersChan := make(chan float64)
+	numbersChan := make(chan *Sample)
 	defer close(numbersChan)
 	go doMath(sampleChan, numbersChan, stopMathChan)
 
