@@ -8,23 +8,15 @@ import (
 )
 
 const READ_BUFFER_SIZE int = 64
-const MAX_PAIRS_RB = READ_BUFFER_SIZE / 4
+const USE_RNG_MODE = "MODE_RNG1WHITE"
 
 type Sample struct {
 	sampleCount uint64
 	sampleTime  time.Time
-	rawData     []byte
-	rawValues   [MAX_PAIRS_RB][2]uint16
-	pruned      [MAX_PAIRS_RB][2]byte
-	walkDeltas  [MAX_PAIRS_RB][2]int8
-	walkSums    WalkSums
-}
-
-type WalkSums struct {
-	sum   int64
-	sumA  int64
-	sumB  int64
-	sumEq int64
+	values      []byte
+	walkDeltas  [READ_BUFFER_SIZE]int8
+	walkSum     int64
+	entropy     float64
 }
 
 func main() {
@@ -44,7 +36,7 @@ func main() {
 	// Set TrueRNG mode to RAWBIN using port-knocking protocol
 	if config.skipModeset {
 		log.Printf("DANGER - skipping modeset.")
-	} else if err := modeChange("MODE_RAW_BIN", tpv2.Name); err != nil {
+	} else if err := modeChange(USE_RNG_MODE, tpv2.Name); err != nil {
 		log.Fatalf("Error setting mode: %v", err)
 	}
 
@@ -61,24 +53,17 @@ func main() {
 	defer close(rawDataChan)
 	go readSerialOnDemand(rng, rawDataChan, signalReadSerialChan, stopReaderChan)
 
-	// Parse raw data into a Sample
-	stopParserChan := make(chan bool)
-	defer close(stopParserChan)
-	sampleChan := make(chan *Sample)
-	defer close(sampleChan)
-	go doParsing(rawDataChan, sampleChan, stopParserChan)
-
-	// Get ready to process data
+	// Process data
 	stopMathChan := make(chan bool)
 	defer close(stopMathChan)
-	numbersChan := make(chan *Sample)
-	defer close(numbersChan)
-	go doMath(sampleChan, numbersChan, stopMathChan)
+	processedSamplesChan := make(chan *Sample)
+	defer close(processedSamplesChan)
+	go doMath(rawDataChan, processedSamplesChan, stopMathChan)
 
 	// Display the data to the user somehow
 	stopDisplayChan := make(chan bool)
 	defer close(stopDisplayChan)
-	go doDisplay(numbersChan, stopDisplayChan)
+	go doDisplay(processedSamplesChan, stopDisplayChan)
 
 	// Ticker to read data at intervals
 	stopTickerChan := make(chan bool)
@@ -103,7 +88,6 @@ func main() {
 	log.Println("Shutting down...")
 	stopTickerChan <- true
 	stopReaderChan <- true
-	stopParserChan <- true
 	stopMathChan <- true
 	stopDisplayChan <- true
 	rng.Close()

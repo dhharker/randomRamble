@@ -48,3 +48,9 @@ sudo apt-get install golang gcc libgl1-mesa-dev xorg-dev
 go install fyne.io/fyne/v2/cmd/fyne@latest
 go mod tidy
 ```
+### Sound
+
+Install libsdl
+```
+sudo apt-get install libsdl2-dev
+```

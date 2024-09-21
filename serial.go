@@ -173,13 +173,8 @@ func readSerialOnDemand(port serial.Port, readChan chan *Sample, signalChan chan
 		spl := &Sample{
 			sampleCount: sampleCounter,
 			sampleTime:  readTime,
-			rawData:     buffer[:n],
-			walkSums: WalkSums{
-				sum:   0,
-				sumA:  0,
-				sumB:  0,
-				sumEq: 0,
-			},
+			values:      buffer[:READ_BUFFER_SIZE],
+			walkSum:     0,
 		}
 
 		// Send the data to the main program via readChan
