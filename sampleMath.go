@@ -24,7 +24,6 @@ func doMath(sampleChan chan *Sample, outputChan chan *Sample, stopMathChan chan 
 		case spl := <-sampleChan:
 			// log.Printf("S %v", spl.values)
 			calculateWalkDeltas(spl)
-			spl.walkSum = sumDeltas(spl)
 			spl.entropy = entropy(spl.values)
 
 			// Send the sample off to display
@@ -59,19 +58,15 @@ func getWalkDelta(x byte) int8 {
 }
 
 func calculateWalkDeltas(spl *Sample) {
+	var s int64 = 0
 	for i, p := range spl.values {
 		histo[p]++
 		spl.walkDeltas[i] = getWalkDelta(p)
+		s += int64(spl.walkDeltas[i])
 	}
+	spl.walkSum = s
 }
 
-func sumDeltas(spl *Sample) int64 {
-	var s int64 = 0
-	for _, d := range spl.walkDeltas {
-		s += int64(d)
-	}
-	return s
-}
 func entropy(data []byte) float64 {
 
 	l := float64(0)

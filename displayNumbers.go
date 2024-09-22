@@ -2,6 +2,8 @@ package main
 
 import "log"
 
+var walkSum int64 = 0
+
 func doDisplay(numbersChan chan *Sample, stopDisplayChan chan bool) {
 
 	for {
@@ -10,7 +12,8 @@ func doDisplay(numbersChan chan *Sample, stopDisplayChan chan bool) {
 			return
 			// case <-numbersChan:
 		case spl := <-numbersChan:
-			log.Printf("#%v %2.3f", spl.sampleCount, spl.entropy)
+			walkSum += spl.walkSum
+			log.Printf("#%v %2.3f  %v", spl.sampleCount, spl.entropy, walkSum)
 		}
 	}
 }
