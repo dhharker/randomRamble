@@ -6,11 +6,16 @@ import (
 )
 
 // goroutine to take a sample and do some maths on it
-func doMath(sampleChan chan *Sample, outputChan chan *Sample, stopMathChan chan bool) {
+func doMath(sampleChan chan *Sample, outputChan chan *Sample, ro *Orchestrator) {
 
+	ro.wg.Add(1)
 	for {
 		select {
-		case <-stopMathChan:
+		case _, isFalse := <-ro.shutdownOnCloseChan:
+			log.Printf("Orchestrator:Shutting down doMath")
+			if isFalse {
+				panic("doMath panic")
+			}
 			log.Printf("Debug bits: %v", debugBits)
 			log.Printf("      Ones: %v", debugBitsOnes)
 			log.Printf("    Zeroes: %v", debugBitsZeroes)
@@ -20,6 +25,8 @@ func doMath(sampleChan chan *Sample, outputChan chan *Sample, stopMathChan chan 
 				dbbr[i] = float32(debugBitsOnes[i]) / float32(debugBitsZeroes[i])
 			}
 			log.Printf("    Ratios: %v", dbbr)
+			close(outputChan)
+			ro.wg.Done()
 			return
 		case spl := <-sampleChan:
 			// log.Printf("S %v", spl.values)
@@ -27,7 +34,9 @@ func doMath(sampleChan chan *Sample, outputChan chan *Sample, stopMathChan chan 
 			spl.entropy = entropy(spl.values)
 
 			// Send the sample off to display
-			outputChan <- spl
+			if !ro.shutdownRequested {
+				outputChan <- spl
+			}
 		}
 	}
 }

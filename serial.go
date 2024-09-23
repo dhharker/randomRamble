@@ -142,44 +142,54 @@ func getConnected(portName string) serial.Port {
 }
 
 // goroutine to read samples from RNG
-func readSerialOnDemand(port serial.Port, readChan chan *Sample, signalChan chan time.Time, stopReaderChan chan bool) {
+func readSerialOnDemand(port serial.Port, readChan chan *Sample, signalChan chan time.Time, ro *Orchestrator) {
+	ro.wg.Add(1)
 	var sampleCounter uint64 = 0
 	for {
 		var readTime time.Time
 
 		select {
-		case <-stopReaderChan:
+		case _, isFalse := <-ro.shutdownOnCloseChan:
+			log.Printf("Orchestrator:Shutting down readSerialOnDemand")
+			if isFalse {
+				panic("readSerialOnDemand panic")
+			}
 			log.Printf("Stopping serial reader after %v samples.", sampleCounter)
+			pcErr := port.Close()
+			log.Printf("Closed port %v", pcErr)
+			close(readChan)
+			log.Printf("Closed readchan")
+			ro.wg.Done()
 			return
 		case readTime = <-signalChan:
 			// block until we're ready for the next read
-		}
 
-		// Create a buffer to hold incoming data
-		buffer := make([]byte, READ_BUFFER_SIZE)
+			// Create a buffer to hold incoming data
+			buffer := make([]byte, READ_BUFFER_SIZE)
 
-		// Flush the buffer first so we're getting freshest data
-		port.ResetInputBuffer()
+			// Flush the buffer first so we're getting freshest data
+			port.ResetInputBuffer()
 
-		// Attempt to read from the serial port
-		n, err := port.Read(buffer)
+			// Attempt to read from the serial port
+			n, err := port.Read(buffer)
 
-		if err != nil {
-			log.Println("Error reading from serial:", err)
-			continue
-		}
+			if err != nil {
+				log.Println("Error reading from serial:", err)
+				continue
+			}
 
-		sampleCounter++
-		spl := &Sample{
-			sampleCount: sampleCounter,
-			sampleTime:  readTime,
-			values:      buffer[:READ_BUFFER_SIZE],
-			walkSum:     0,
-		}
+			sampleCounter++
+			spl := &Sample{
+				sampleCount: sampleCounter,
+				sampleTime:  readTime,
+				values:      buffer[:READ_BUFFER_SIZE],
+				walkSum:     0,
+			}
 
-		// Send the data to the main program via readChan
-		if n > 0 {
-			readChan <- spl
+			// Send the data to the main program via readChan
+			if n > 0 && !ro.shutdownRequested {
+				readChan <- spl
+			}
 		}
 	}
 }

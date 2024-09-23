@@ -12,6 +12,7 @@ type Config struct {
 	tickDelayMs     int
 	port            string
 	skipModeset     bool
+	showGui         bool
 }
 
 func getConfig() *Config {
@@ -22,7 +23,8 @@ func getConfig() *Config {
 	flag.DurationVar(&c.captureDuration, "duration", 0, "How long to capture for e.g. 10s. Leave blank to run until closed.")
 	flag.IntVar(&c.tickDelayMs, "rate", 1000, "Delay between samples in ms e.g. 100 to sample at 10Hz.")
 	flag.StringVar(&c.port, "port", "", "USBTTY Port with TrueRNGpro V2. Leave blank to auto-detect.")
-	flag.BoolVar(&c.skipModeset, "skip-modeset", false, "DANGER skip modeset on init. Modeset is slow. Only use if mode already set.")
+	flag.BoolVar(&c.skipModeset, "skipmodeset", false, "DANGER skip modeset on init. Modeset is slow. Only use if mode already set.")
+	flag.BoolVar(&c.showGui, "gui", false, "Show gui")
 
 	flag.Parse()
 
@@ -36,6 +38,8 @@ func getConfig() *Config {
 		log.Println("Will capture indefinitely until program is terminated.")
 	} else if c.captureDuration < 0 {
 		log.Fatal("Cannot capture for negative duration.")
+	} else if c.captureDuration <= time.Duration(c.tickDelayMs*int(time.Millisecond)) {
+		log.Fatal("Capture duration must exceed capture rate.")
 	} else {
 		log.Printf("Will capture for %v or until program is terminated.", c.captureDuration)
 	}

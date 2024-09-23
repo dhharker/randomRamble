@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -8,22 +9,28 @@ import (
 	"time"
 )
 
-func shutdownAfterDelay(delay time.Duration, shutdownCtlChan chan bool) {
+func shutdownAfterDelay(delay time.Duration, ro *Orchestrator) {
 	if delay > 0 {
 		time.Sleep(delay)
-		log.Printf("Run duration of %v elapsed. Shutting down.", delay)
-		shutdownCtlChan <- true
+		ro.shutdown(fmt.Sprintf("shutdownAfterDelay %v", delay))
 	}
 }
 
-func demandSerialReadOnTick(t *time.Ticker, signalReadSerialChan chan time.Time, stopTickerChan chan bool) {
+func demandSerialReadOnTick(t *time.Ticker, signalReadSerialChan chan time.Time, ro *Orchestrator) {
+	ro.wg.Add(1)
+	// Make sure we do at least one read
+	signalReadSerialChan <- time.Now()
 	for {
 		select {
-		case <-stopTickerChan:
-			// log.Println("Stopping ticker...")
+		case _, isFalse := <-ro.shutdownOnCloseChan:
+			log.Printf("Orchestrator:Shutting down demandSerialReadOnTick")
+			if isFalse {
+				panic("demandSerialReadOnTick panic")
+			}
 			t.Stop()
+			close(signalReadSerialChan)
+			ro.wg.Done()
 			return
-		// interval task
 		case tm := <-t.C:
 			// log.Println("Tick: ", tm)
 			signalReadSerialChan <- tm
@@ -31,11 +38,10 @@ func demandSerialReadOnTick(t *time.Ticker, signalReadSerialChan chan time.Time,
 	}
 }
 
-func shutdownOnSignal(shutdownCtlChan chan bool) {
+func shutdownOnSignal(ro *Orchestrator) {
 	sigs := make(chan os.Signal, 1)
 	defer close(sigs)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-sigs
-	log.Printf("Caught signal %v shutting down", sig)
-	shutdownCtlChan <- true
+	ro.shutdown(fmt.Sprintf("shutdownOnSignal %v", sig))
 }

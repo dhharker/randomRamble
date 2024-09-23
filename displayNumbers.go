@@ -4,11 +4,16 @@ import "log"
 
 var walkSum int64 = 0
 
-func doDisplay(numbersChan chan *Sample, stopDisplayChan chan bool) {
-
+func doDisplay(numbersChan chan *Sample, ro *Orchestrator) {
+	ro.wg.Add(1)
 	for {
 		select {
-		case <-stopDisplayChan:
+		case _, isFalse := <-ro.shutdownOnCloseChan:
+			log.Printf("Orchestrator:Shutting down doDisplay")
+			if isFalse {
+				panic("doDisplay panic")
+			}
+			ro.wg.Done()
 			return
 			// case <-numbersChan:
 		case spl := <-numbersChan:
