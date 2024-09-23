@@ -35,8 +35,9 @@ func main() {
 	go shutdownOnSignal(ro)
 
 	samplesChan := getSamples(config, ro)
-	doDisplay(samplesChan, ro)
+	go doDisplay(samplesChan, ro)
 
+	time.Sleep(1 * time.Second)
 	ro.wg.Wait()
 }
 
