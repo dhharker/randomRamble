@@ -34,6 +34,12 @@ func getConfig() *Config {
 		log.Printf("Writing output to %s.csv", c.fileName)
 	}
 
+	if c.showGui {
+		log.Println("GUI Mode")
+	} else {
+		log.Println("CLI Mode")
+	}
+
 	if int(c.captureDuration) == 0 {
 		log.Println("Will capture indefinitely until program is terminated.")
 	} else if c.captureDuration < 0 {

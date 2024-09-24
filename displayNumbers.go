@@ -4,7 +4,7 @@ import "log"
 
 var walkSum int64 = 0
 
-func doDisplay(numbersChan chan *Sample, ro *Orchestrator) {
+func doDisplay(samplesChan chan *Sample, ro *Orchestrator) {
 	ro.wg.Add(1)
 	for {
 		select {
@@ -16,7 +16,7 @@ func doDisplay(numbersChan chan *Sample, ro *Orchestrator) {
 			ro.wg.Done()
 			return
 			// case <-numbersChan:
-		case spl := <-numbersChan:
+		case spl := <-samplesChan:
 			walkSum += spl.walkSum
 			log.Printf("#%v %2.3f  %v", spl.sampleCount, spl.entropy, walkSum)
 		}

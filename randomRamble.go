@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-const READ_BUFFER_SIZE int = 64
+const READ_BUFFER_SIZE int = 128
 const USE_RNG_MODE = "MODE_RNG1WHITE"
 
 type Sample struct {
@@ -34,10 +34,20 @@ func main() {
 	// Shut down on SIGINT or SIGKILL
 	go shutdownOnSignal(ro)
 
+	// Get Samples from RNG
 	samplesChan := getSamples(config, ro)
-	go doDisplay(samplesChan, ro)
 
-	time.Sleep(1 * time.Second)
+	if config.showGui {
+		ro.wg.Add(1)
+		_, w := gui(samplesChan, ro)
+		// Blocks until the GUI quits
+		w.ShowAndRun()
+		ro.wg.Done()
+	} else {
+		go doDisplay(samplesChan, ro)
+		time.Sleep(1 * time.Second)
+	}
+
 	ro.wg.Wait()
 }
 

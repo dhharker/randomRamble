@@ -33,7 +33,9 @@ func demandSerialReadOnTick(t *time.Ticker, signalReadSerialChan chan time.Time,
 			return
 		case tm := <-t.C:
 			// log.Println("Tick: ", tm)
-			signalReadSerialChan <- tm
+			if !ro.shutdownRequested {
+				signalReadSerialChan <- tm
+			}
 		}
 	}
 }
