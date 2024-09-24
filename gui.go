@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"log"
 
-	"fyne.io/fyne"
-	"fyne.io/fyne/app"
-	"fyne.io/fyne/widget"
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/data/binding"
+	"fyne.io/fyne/v2/widget"
 )
 
 func gui(samplesChan chan *Sample, ro *Orchestrator) (fyne.App, fyne.Window) {
@@ -14,7 +15,11 @@ func gui(samplesChan chan *Sample, ro *Orchestrator) (fyne.App, fyne.Window) {
 	a := app.New()
 	w := a.NewWindow("Hello World")
 
-	w.SetContent(widget.NewLabel("I'm a potato!"))
+	str := binding.NewString()
+	str.Set("I am a string.")
+	label := widget.NewLabelWithData(str)
+
+	w.SetContent(label)
 	// Close the GUI if orchestrator requests
 	log.Println("Initialising hook orchestrator GUI quit")
 	go func() {
@@ -35,8 +40,8 @@ func gui(samplesChan chan *Sample, ro *Orchestrator) (fyne.App, fyne.Window) {
 	log.Println("Initialising hook update window on sample")
 	go func() {
 		for spl := range samplesChan {
-			w.SetContent(widget.NewLabel(fmt.Sprintf("%v", spl.walkSum)))
 
+			str.Set(fmt.Sprintf("%v", spl.walkSum))
 		}
 	}()
 

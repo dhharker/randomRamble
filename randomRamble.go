@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// Note: don't put this too high; 256 resulted in a bunch of null reads which screws up the stats
 const READ_BUFFER_SIZE int = 128
 const USE_RNG_MODE = "MODE_RNG1WHITE"
 
