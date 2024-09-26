@@ -54,3 +54,7 @@ Install libsdl
 ```
 sudo apt-get install libsdl2-dev
 ```
+
+### @TODO
+
+- Close channels in orchestrator shutdown blocks in data pipeline goroutines

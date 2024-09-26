@@ -9,6 +9,11 @@ import (
 	"go.bug.st/serial/enumerator"
 )
 
+var RngModeStrings = map[RngMode]string{
+	RngRawMode:   "MODE_RAWBIN",
+	RngWhiteMode: "MODE_RNG1WHITE",
+}
+
 // Find USB serial ports with a TrueRNGpro V2 attached
 // portName optional ignore ports other than this one
 func findTPV2Port(portName string) *enumerator.PortDetails {
@@ -49,7 +54,9 @@ func findTPV2Port(portName string) *enumerator.PortDetails {
 }
 
 // Function to change mode by setting different baud rates
-func modeChange(MODE string, PORT string) error {
+func modeChange(rngMode RngMode, PORT string) error {
+	var MODE = RngModeStrings[rngMode]
+
 	log.Printf("Setting RNG to %s...", MODE)
 
 	// Function to open and close the port at specific baud rate
@@ -142,7 +149,7 @@ func getConnected(portName string) serial.Port {
 }
 
 // goroutine to read samples from RNG
-func readSerialOnDemand(port serial.Port, readChan chan *Sample, signalChan chan time.Time, ro *Orchestrator) {
+func readSerialOnDemand(port serial.Port, sampleType RngMode, readChan chan *Sample, signalChan chan time.Time, ro *Orchestrator) {
 	ro.wg.Add(1)
 	var sampleCounter uint64 = 0
 	for {
@@ -182,6 +189,7 @@ func readSerialOnDemand(port serial.Port, readChan chan *Sample, signalChan chan
 			spl := &Sample{
 				sampleCount: sampleCounter,
 				sampleTime:  readTime,
+				sampleType:  sampleType,
 				values:      buffer[:READ_BUFFER_SIZE],
 				walkSum:     0,
 			}

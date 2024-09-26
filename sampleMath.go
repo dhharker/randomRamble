@@ -5,16 +5,50 @@ import (
 	"math"
 )
 
-// goroutine to take a sample and do some maths on it
-func doMath(sampleChan chan *Sample, outputChan chan *Sample, ro *Orchestrator) {
+func doWhiteStats(sampleChan chan *Sample, outputChan chan *Sample, ro *Orchestrator) {
 
 	ro.wg.Add(1)
 	for {
 		select {
 		case _, isFalse := <-ro.shutdownOnCloseChan:
-			log.Printf("Orchestrator:Shutting down doMath")
+			log.Printf("Orchestrator:Shutting down doWhiteStats")
 			if isFalse {
-				panic("doMath panic")
+				panic("doWhiteStats panic")
+			}
+			log.Printf("Debug bits: %v", debugBits)
+			log.Printf("      Ones: %v", debugBitsOnes)
+			log.Printf("    Zeroes: %v", debugBitsZeroes)
+			log.Printf("     Histo: %v", histo)
+			var dbbr = [8]float32{}
+			for i := range debugBits {
+				dbbr[i] = float32(debugBitsOnes[i]) / float32(debugBitsZeroes[i])
+			}
+			log.Printf("    Ratios: %v", dbbr)
+			close(outputChan)
+			ro.wg.Done()
+			return
+		case spl := <-sampleChan:
+			// log.Printf("S %v", spl.values)
+			calculateWalkDeltas(spl)
+			spl.entropy = entropy(spl.values)
+
+			if !ro.shutdownRequested {
+				outputChan <- spl
+			}
+		}
+	}
+
+}
+
+func doRawStats(sampleChan chan *Sample, outputChan chan *Sample, ro *Orchestrator) {
+
+	ro.wg.Add(1)
+	for {
+		select {
+		case _, isFalse := <-ro.shutdownOnCloseChan:
+			log.Printf("Orchestrator:Shutting down doRawStats")
+			if isFalse {
+				panic("doRawStats panic")
 			}
 			log.Printf("Debug bits: %v", debugBits)
 			log.Printf("      Ones: %v", debugBitsOnes)
@@ -39,6 +73,7 @@ func doMath(sampleChan chan *Sample, outputChan chan *Sample, ro *Orchestrator) 
 			}
 		}
 	}
+
 }
 
 var EACH_BIT = [...]byte{0b10000000, 0b01000000, 0b00100000, 0b00010000, 0b00001000, 0b00000100, 0b00000010, 0b00000001}

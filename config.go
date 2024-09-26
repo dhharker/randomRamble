@@ -6,11 +6,19 @@ import (
 	"time"
 )
 
+type RngMode = int
+
+const (
+	RngRawMode RngMode = iota
+	RngWhiteMode
+)
+
 type Config struct {
 	fileName        string
 	captureDuration time.Duration
 	tickDelayMs     int
 	port            string
+	mode            RngMode
 	skipModeset     bool
 	showGui         bool
 }
@@ -18,20 +26,31 @@ type Config struct {
 func getConfig() *Config {
 
 	c := Config{}
+	var modeStr string
 
 	flag.StringVar(&c.fileName, "filename", "", "Base filename to record data. Leave blank to not save data.")
 	flag.DurationVar(&c.captureDuration, "duration", 0, "How long to capture for e.g. 10s. Leave blank to run until closed.")
 	flag.IntVar(&c.tickDelayMs, "rate", 1000, "Delay between samples in ms e.g. 100 to sample at 10Hz.")
 	flag.StringVar(&c.port, "port", "", "USBTTY Port with TrueRNGpro V2. Leave blank to auto-detect.")
+	flag.StringVar(&modeStr, "mode", "", "RNG mode enum white|raw. White mode reads white noise from the RNG. Raw mode reads pairs of ADC values. Analysis available are different. RNG only supports one mode at a time.")
 	flag.BoolVar(&c.skipModeset, "skipmodeset", false, "DANGER skip modeset on init. Modeset is slow. Only use if mode already set.")
 	flag.BoolVar(&c.showGui, "gui", false, "Show gui")
-
 	flag.Parse()
 
 	if c.fileName == "" {
 		log.Println("Not saving output to file.")
 	} else {
 		log.Printf("Writing output to %s.csv", c.fileName)
+	}
+
+	switch modeStr {
+	case "white":
+		c.mode = RngWhiteMode
+	case "raw":
+		c.mode = RngRawMode
+	default:
+
+		log.Panic("RNG -mode must be 'white' or 'raw'.")
 	}
 
 	if c.showGui {
