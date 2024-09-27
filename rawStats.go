@@ -7,33 +7,43 @@ import (
 	"github.com/montanaflynn/stats"
 )
 
-const RING_BUFFER_DURATION_SECONDS = 5
+const RING_BUFFER_DURATION_SECONDS = 1
 
 // This ALWAYS refers to calculations done with BIN_VALS_SIZE values
-type AggregateStats struct {
-	mean     float64
-	variance float64
-	sum      float64
-	stdS     float64
+type ChunkStats struct {
+	mean               float64
+	variance           float64
+	sum                float64
+	sStdDev            float64
+	deviations         []float64
+	deviationsInStDevs []float64
 }
 
 // Calculated for the whole of the window buffer by adding/subtracting the new/old data values only
-type RunningStats struct {
+type WindowStats struct {
 	sum  float64
 	mean float64
+}
+
+// Stats for entire run
+type RunningStats struct {
+	correlationSum float64
 }
 
 func doRawStats(config *Config, sampleChan chan *Sample, outputChan chan *Sample, ro *Orchestrator) {
 
 	// reads per second * seconds in ring * values per read
-	windowBufferSize := nextPowerOf2(uint32(math.Ceil(1000 / float64(config.tickDelayMs) * RING_BUFFER_DURATION_SECONDS * float64(BIN_VALS_SIZE))))
+	adcValueWindowBufferSize := nextPowerOf2(uint32(math.Ceil(1000 / float64(config.tickDelayMs) * RING_BUFFER_DURATION_SECONDS * float64(BIN_VALS_SIZE))))
 
 	// Store recent ADC values
-	bufAs := NewWindowBuffer[float64](int(windowBufferSize))
-	bufBs := NewWindowBuffer[float64](int(windowBufferSize))
+	bufAs := NewWindowBuffer[float64](int(adcValueWindowBufferSize))
+	bufBs := NewWindowBuffer[float64](int(adcValueWindowBufferSize))
 
 	// Track stats of contents of WindowBuffers
-	var bufAStats, bufBStats RunningStats
+	var bufAStats, bufBStats WindowStats
+
+	// Track stats for run
+	var runningStats RunningStats
 
 	// If the window buffers were filled before we WriteShift()ed the latest data in then we can do calcs.
 	alreadyFilled := false
@@ -43,7 +53,8 @@ func doRawStats(config *Config, sampleChan chan *Sample, outputChan chan *Sample
 		select {
 		case _, isFalse := <-ro.shutdownOnCloseChan:
 			log.Printf("Orchestrator:Shutting down doRawStats")
-			log.Printf("Window buffer size: %v samples (%v bytes)", windowBufferSize, windowBufferSize*64)
+			log.Printf("Window buffer size: %v samples (%v bytes)", adcValueWindowBufferSize, adcValueWindowBufferSize*64)
+			log.Printf("Window buffer duration: ~%1.1fs", (float64(adcValueWindowBufferSize)/float64(BIN_VALS_SIZE))/(1000/float64(config.tickDelayMs)))
 			if isFalse {
 				panic("doRawStats panic")
 			}
@@ -62,45 +73,57 @@ func doRawStats(config *Config, sampleChan chan *Sample, outputChan chan *Sample
 			subtractAs := bufAs.WriteShift(rngA[:])
 			subtractBs := bufBs.WriteShift(rngB[:])
 
-			agA, err := aggregate(rngA[:])
+			sumAs, err := stats.Sum(rngA[:])
 			if err != nil {
-				log.Printf("Error aggregating A %v", err)
+				log.Printf("Error sum A %v", err)
 			}
-			agB, err := aggregate(rngB[:])
+			sumBs, err := stats.Sum(rngB[:])
 			if err != nil {
-				log.Printf("Error aggregating B %v", err)
+				log.Printf("Error sum B %v", err)
 			}
 
 			// Add the sum of the new data to the running sum for the wb
-			bufAStats.sum += agA.sum
-			bufBStats.sum += agB.sum
+			bufAStats.sum += sumAs
+			bufBStats.sum += sumBs
 
 			// If the buffers were already full when we added data, then subtract the sums of the removed data from the running sums
 			if alreadyFilled {
-				agAR, err := aggregate(subtractAs[:])
+				sumARs, err := stats.Sum(subtractAs[:])
 				if err != nil {
 					log.Printf("Error aggregating AR %v", err)
 				}
-				agBR, err := aggregate(subtractBs[:])
+				sumBRs, err := stats.Sum(subtractBs[:])
 				if err != nil {
 					log.Printf("Error aggregating BR %v", err)
 				}
-				bufAStats.sum -= agAR.sum
-				bufBStats.sum -= agBR.sum
+				bufAStats.sum -= sumARs
+				bufBStats.sum -= sumBRs
+			}
 
-				// Update running means
-				bufAStats.mean = bufAStats.sum / float64(windowBufferSize)
-				bufBStats.mean = bufBStats.sum / float64(windowBufferSize)
+			// Update running means
+			if bufAs.filled {
+				bufAStats.mean = bufAStats.sum / float64(adcValueWindowBufferSize)
+				bufBStats.mean = bufBStats.sum / float64(adcValueWindowBufferSize)
 			} else {
-				// Update running means
 				bufAStats.mean = bufAStats.sum / float64(bufAs.writePtr)
 				bufBStats.mean = bufBStats.sum / float64(bufBs.writePtr)
 			}
 
-			log.Printf("%v %3.1f %3.1f", alreadyFilled, bufAStats.mean, bufBStats.mean)
+			chunkAStats := chunkStats(rngA[:], bufAStats.mean)
+			chunkBStats := chunkStats(rngB[:], bufBStats.mean)
 
-			// 	cov, _ := stats.Correlation(rngA[:], rngB[:])
-			// log.Printf("Correlation: %2.2f", cov)
+			cor, _ := stats.Correlation(chunkAStats.deviationsInStDevs, chunkBStats.deviationsInStDevs)
+			var corEmo = ""
+			switch {
+			case cor > 0:
+				corEmo = "\u2795"
+			case cor < 0:
+				corEmo = "\u2796"
+			default:
+				corEmo = "\u27A1"
+			}
+			runningStats.correlationSum += cor
+			log.Printf("Correlation(tally): %v\t% 2.2f\t(%2.2f)", corEmo, cor, runningStats.correlationSum)
 
 			// agB, _ := aggregate(rngb)
 			// log.Printf("AG AM: %2.1f\tAV: %2.1f\tBM: %2.1f\tBV: %2.1f", agA.mean, agA.variance, agB.mean, agB.variance)
@@ -111,36 +134,45 @@ func doRawStats(config *Config, sampleChan chan *Sample, outputChan chan *Sample
 	}
 }
 
-func aggregate(vals []float64) (*AggregateStats, error) {
+func chunkStats(vals []float64, windowMean float64) *ChunkStats {
 
-	mean, err := stats.Mean(vals[:])
-	if err != nil {
-		return nil, err
+	deviations := getDeviations(vals[:], windowMean)
+	sqDeviations := squares(deviations)
+	sumSqDevs, _ := stats.Sum(sqDeviations)
+	sStdDev := math.Sqrt(sumSqDevs / float64(len(vals)-1))
+	deviationsInStDevs := scale(deviations, sStdDev)
+
+	as := &ChunkStats{
+		sStdDev:            sStdDev,
+		deviations:         deviations,
+		deviationsInStDevs: deviationsInStDevs,
 	}
 
-	variance, err := stats.Variance(vals[:])
-	if err != nil {
-		return nil, err
-	}
+	return as
+}
 
-	sum, err := stats.Sum(vals[:])
-	if err != nil {
-		return nil, err
+func getDeviations(vals []float64, mean float64) []float64 {
+	o := make([]float64, len(vals))
+	for i, v := range vals {
+		o[i] = v - mean
 	}
+	return o
+}
 
-	stdS, err := stats.StandardDeviationSample(vals[:])
-	if err != nil {
-		return nil, err
+func squares(vals []float64) []float64 {
+	o := make([]float64, len(vals))
+	for i, v := range vals {
+		o[i] = math.Pow(v, 2)
 	}
+	return o
+}
 
-	as := &AggregateStats{
-		mean:     mean,
-		variance: variance,
-		sum:      sum,
-		stdS:     stdS,
+func scale(vals []float64, scaleBy float64) []float64 {
+	o := make([]float64, len(vals))
+	for i, v := range vals {
+		o[i] = v / scaleBy
 	}
-
-	return as, nil
+	return o
 }
 
 func unzip2dAry(input [BIN_VALS_SIZE][2]uint16) ([BIN_VALS_SIZE]float64, [BIN_VALS_SIZE]float64) {
