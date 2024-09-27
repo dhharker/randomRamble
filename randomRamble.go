@@ -9,6 +9,7 @@ import (
 
 // Note: don't put this too high; 256 resulted in a bunch of null reads which screws up the stats
 const READ_BUFFER_SIZE int = 128
+const BIN_VALS_SIZE = READ_BUFFER_SIZE / 4 // 2 bytes * 2 RNGs
 
 type Sample struct {
 	// Incremented every time READ_BUFFER_SIZE bytes are read from the RNG into a Sample
@@ -18,8 +19,9 @@ type Sample struct {
 	// is it a WhiteSample or a RawSample?
 	sampleType RngMode
 
-	// The output of the RNG. In raw mode these may be blank or derived.
-	values []byte
+	// Data read from RNG over serial port
+	sample []byte
+
 	// +/- sum of zeroes (-1) and 1s (+1) in each value
 	walkDeltas [READ_BUFFER_SIZE]int8
 	// Sum of walkDeltas
@@ -29,7 +31,7 @@ type Sample struct {
 
 	// Used in raw mode where we have a stream of pairs of normally distributed 10-bit ADC readings, one from each RNG
 	// Array of tuples containing the raw ADC reading from generators A and B
-	rawValues [][2]uint16
+	rawValues [BIN_VALS_SIZE][2]uint16
 }
 
 func main() {
@@ -90,8 +92,8 @@ func getSamples(config *Config, ro *Orchestrator) chan *Sample {
 		if config.mode == RngRawMode {
 			// In RAWBIN mode we must parse the binary format to get the raw values for ADCs A and B
 			parsedBinaryFormatChan := make(chan *Sample)
-			go parseRawBinaryFormat(rngSerialOutputChan, parsedBinaryFormatChan, ro)
-			go doRawStats(parsedBinaryFormatChan, processedSamplesChan, ro)
+			go doParseBinaryFormat(rngSerialOutputChan, parsedBinaryFormatChan, ro)
+			go doRawStats(config, parsedBinaryFormatChan, processedSamplesChan, ro)
 		} else {
 			// Process data and send to output chan (passed from main)
 			go doWhiteStats(rngSerialOutputChan, processedSamplesChan, ro)

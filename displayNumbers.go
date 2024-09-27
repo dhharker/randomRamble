@@ -18,7 +18,7 @@ func doDisplay(samplesChan chan *Sample, ro *Orchestrator) {
 			// case <-numbersChan:
 		case spl := <-samplesChan:
 			walkSum += spl.walkSum
-			log.Printf("#%v %2.3f  %v", spl.sampleCount, spl.entropy, walkSum)
+			//log.Printf("#%v %2.3f  %v", spl.sampleCount, spl.entropy, walkSum)
 		}
 	}
 }

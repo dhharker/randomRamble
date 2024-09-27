@@ -10,7 +10,7 @@ import (
 )
 
 var RngModeStrings = map[RngMode]string{
-	RngRawMode:   "MODE_RAWBIN",
+	RngRawMode:   "MODE_RAW_BIN",
 	RngWhiteMode: "MODE_RNG1WHITE",
 }
 
@@ -190,7 +190,7 @@ func readSerialOnDemand(port serial.Port, sampleType RngMode, readChan chan *Sam
 				sampleCount: sampleCounter,
 				sampleTime:  readTime,
 				sampleType:  sampleType,
-				values:      buffer[:READ_BUFFER_SIZE],
+				sample:      buffer[:READ_BUFFER_SIZE],
 				walkSum:     0,
 			}
 
