@@ -123,7 +123,7 @@ func doRawStats(config *Config, sampleChan chan *Sample, outputChan chan *Sample
 				corEmo = "\u27A1"
 			}
 			runningStats.correlationSum += cor
-			log.Printf("Correlation(tally): %v\t% 2.2f\t(%2.2f)", corEmo, cor, runningStats.correlationSum)
+			log.Printf("Correlation(tally): %v\t% 2.2f\t(% 2.2f)", corEmo, cor, runningStats.correlationSum)
 
 			// agB, _ := aggregate(rngb)
 			// log.Printf("AG AM: %2.1f\tAV: %2.1f\tBM: %2.1f\tBV: %2.1f", agA.mean, agA.variance, agB.mean, agB.variance)

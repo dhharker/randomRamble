@@ -152,6 +152,7 @@ func getConnected(portName string) serial.Port {
 func readSerialOnDemand(port serial.Port, sampleType RngMode, readChan chan *Sample, signalChan chan time.Time, ro *Orchestrator) {
 	ro.wg.Add(1)
 	var sampleCounter uint64 = 0
+
 	for {
 		var readTime time.Time
 
@@ -161,7 +162,7 @@ func readSerialOnDemand(port serial.Port, sampleType RngMode, readChan chan *Sam
 			if isFalse {
 				panic("readSerialOnDemand panic")
 			}
-			log.Printf("Stopping serial reader after %v samples.", sampleCounter)
+			log.Printf("Stopping serial reader after %v samples * %v bytes = %v bytes total", sampleCounter, CAPTURE_SAMPLE_BYTES, int(sampleCounter)*CAPTURE_SAMPLE_BYTES)
 			pcErr := port.Close()
 			log.Printf("Closed port %v", pcErr)
 			close(readChan)
@@ -169,20 +170,32 @@ func readSerialOnDemand(port serial.Port, sampleType RngMode, readChan chan *Sam
 			ro.wg.Done()
 			return
 		case readTime = <-signalChan:
-			// block until we're ready for the next read
 
-			// Create a buffer to hold incoming data
-			buffer := make([]byte, READ_BUFFER_SIZE)
+			if ro.shutdownRequested {
+				return
+			}
+
+			// Create a readBuffer to hold incoming data
+			readBuffer := make([]byte, 128)
+			sampleBuffer := make([]byte, CAPTURE_SAMPLE_BYTES)
+			sampleSlice := sampleBuffer[:0]
 
 			// Flush the buffer first so we're getting freshest data
 			port.ResetInputBuffer()
 
-			// Attempt to read from the serial port
-			n, err := port.Read(buffer)
+			// Keep track of total bytes read until we have enough
+			bytesRead := 0
 
-			if err != nil {
-				log.Println("Error reading from serial:", err)
-				continue
+			// Attempt to read from the serial port
+			for bytesRead < CAPTURE_SAMPLE_BYTES {
+				n, err := port.Read(readBuffer)
+				if err != nil {
+					log.Println("Error reading from serial:", err)
+					continue
+				}
+				sampleSlice = append(sampleSlice, readBuffer[0:n]...)
+				bytesRead += n
+
 			}
 
 			sampleCounter++
@@ -190,12 +203,12 @@ func readSerialOnDemand(port serial.Port, sampleType RngMode, readChan chan *Sam
 				sampleCount: sampleCounter,
 				sampleTime:  readTime,
 				sampleType:  sampleType,
-				sample:      buffer[:READ_BUFFER_SIZE],
+				sample:      sampleSlice[:CAPTURE_SAMPLE_BYTES],
 				walkSum:     0,
 			}
 
 			// Send the data to the main program via readChan
-			if n > 0 && !ro.shutdownRequested {
+			if !ro.shutdownRequested {
 				readChan <- spl
 			}
 		}
