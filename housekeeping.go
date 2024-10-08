@@ -20,6 +20,17 @@ func demandSerialReadOnTick(t *time.Ticker, signalReadSerialChan chan time.Time,
 	ro.wg.Add(1)
 	// Make sure we do at least one read
 	signalReadSerialChan <- time.Now()
+
+	// On shutdown, stop the ticker and give all the other modules time to finish whatever they're doing
+	// If we don't drain the chain then we get race conditions and app fails to quit
+	// @TODO this could probably be made nicer by making all the shutdown stuff synchronous
+	ro.onShutdown(func() {
+		
+		log.Printf("Orchestrator:Sync Stop ticker and wait")
+		t.Stop()
+		time.Sleep(1*time.Second)
+		log.Printf("Orchestrator:Sync    (continue)")
+	})
 	for {
 		select {
 		case _, isFalse := <-ro.shutdownOnCloseChan:
