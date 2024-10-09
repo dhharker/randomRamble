@@ -25,7 +25,6 @@ func demandSerialReadOnTick(t *time.Ticker, signalReadSerialChan chan time.Time,
 	// If we don't drain the chain then we get race conditions and app fails to quit
 	// @TODO this could probably be made nicer by making all the shutdown stuff synchronous
 	ro.onShutdown(func() {
-		
 		log.Printf("Orchestrator:Sync Stop ticker and wait")
 		t.Stop()
 		time.Sleep(1*time.Second)
